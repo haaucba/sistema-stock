@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Stock</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* ----------------- STYLES GENERALES ----------------- */
+        .sidebar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            position: fixed;
+            width: 250px;
+            left: -250px;
+            transition: left 0.3s ease;
+            z-index: 1000;
+        }
+        .sidebar.show {
+            left: 0;
+        }
+        .sidebar .nav-link {
+            color: white;
+            border-radius: 10px;
+            margin: 5px 15px;
+            transition: all 0.3s ease;
+        }
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            transform: translateX(5px);
+        }
+        .content {
+            margin-left: 0;
+            transition: margin-left 0.3s ease;
+            padding: 20px;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        .content.shifted {
+            margin-left: 250px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 25px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .table {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .section {
+            display: none;
+        }
+        .section.active {
+            display: block;
+        }
+        .stats-card {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .prediction-card {
+            background: linear-gradient(45deg, #fa709a, #fee140);
+            color: white;
+        }
+        .stock-low {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+        }
+        .form-control {
+            border-radius: 10px;
+            border: 2px solid #e1e5e9;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .login-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .admin-only {
+            /* No display override here; JS will hide as needed */
+        }
+    </style>
+</head>
+<body>
+    <!-- ====================== LOGIN ====================== -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-card">
+            <h2 class="text-center mb-4">
+                <i class="fas fa-warehouse text-primary"></i>
+                Sistema de Stock
+            </h2>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label class="form-label">Usuario</label>
+                    <input type="text" class="form-control" id="username" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Contraseña</label>
+                    <input type="password" class="form-control" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                </button>
+            </form>
+            <div class="mt-3">
+                <small class="text-muted">
+                    <strong>Usuarios de prueba:</strong><br>
+                    Admin: admin / admin123<br>
+                    User: user / user123
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============== MAIN APPLICATION ============== -->
+    <div id="mainApp" style="display: none;">
+        <!-- Navbar -->
+        <nav class="navbar navbar-dark">
+            <div class="container-fluid">
+                <button class="btn btn-outline-light" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <span class="navbar-brand">Sistema de Stock</span>
+                <div>
+                    <span class="text-light me-3">
+                        <i class="fas fa-user"></i> <span id="currentUser"></span>
+                    </span>
+                    <button class="btn btn-outline-light" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Salir
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="p-3">
+                <h5 class="text-white">Menú Principal</h5>
+            </div>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showSection('dashboard')">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showSection('products')">
+                        <i class="fas fa-box"></i> Productos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showSection('movements')">
+                        <i class="fas fa-exchange-alt"></i> Movimientos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showSection('stock')">
+                        <i class="fas fa-warehouse"></i> Stock Actual
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showSection('predictions')">
+                        <i class="fas fa-chart-line"></i> Predicciones
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Content -->
+        <div class="content" id="content">
+            <!-- ======= Dashboard Section ======= -->
+            <div id="dashboard" class="section active fade-in">
+                <h2><i class="fas fa-tachometer-alt text-primary"></i> Dashboard</h2>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="stats-card">
+                            <h4 id="totalProducts">0</h4>
+                            <p>Total Productos</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-card stock-low">
+                            <h4 id="lowStock">0</h4>
+                            <p>Stock Bajo</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-card prediction-card">
+                            <h4 id="totalValue">$0</h4>
+                            <p>Valor Total</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-card">
+                            <h4 id="recentMovements">0</h4>
+                            <p>Movimientos Hoy</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======= Products Section ======= -->
+            <div id="products" class="section">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="fas fa-box text-primary"></i> Productos</h2>
+                    <button class="btn btn-primary admin-only" onclick="showProductModal()">
+                        <i class="fas fa-plus"></i> Nuevo Producto
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nombre</th>
+                                        <th>SKU</th>
+                                        <th>Categoría</th>
+                                        <th>Precio Venta</th>
+                                        <th>Ubicación</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productsTable">
+                                    <!-- Se rellena con JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======= Movements Section ======= -->
+            <div id="movements" class="section">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="fas fa-exchange-alt text-primary"></i> Movimientos</h2>
+                    <button class="btn btn-primary admin-only" onclick="showMovementModal()">
+                        <i class="fas fa-plus"></i> Nuevo Movimiento
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Producto</th>
+                                        <th>Tipo</th>
+                                        <th>Cantidad</th>
+                                        <th>Orden</th>
+                                        <th>Notas</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="movementsTable">
+                                    <!-- Se rellena con JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                          <!-- Aquí van los controles de paginación -->
+                            <nav>
+                                <ul class="pagination justify-content-center" id="movementsPagination">
+                                    <!-- Se generan botones de página desde JS -->
+                                </ul>
+                            </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======= Stock Section ======= -->
+            <div id="stock" class="section">
+                <h2><i class="fas fa-warehouse text-primary"></i> Stock Actual</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>SKU</th>
+                                        <th>Cantidad</th>
+                                        <th>Costo Unit.</th>
+                                        <th>Valor Total</th>
+                                        <th>Última Act.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stockTable">
+                                    <!-- Se rellena con JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======= Predictions Section ======= -->
+            <div id="predictions" class="section">
+                <h2><i class="fas fa-chart-line text-primary"></i> Predicciones de Stock</h2>
+                <div class="row" id="predictionsContainer">
+                    <!-- Se rellena con JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== PRODUCT MODAL ================== -->
+    <div class="modal fade" id="productModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productModalTitle">Nuevo Producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="productForm">
+                        <input type="hidden" id="productId" value="">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Nombre del Producto</label>
+                                    <input type="text" class="form-control" id="productName" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">SKU</label>
+                                    <input type="text" class="form-control" id="productSku" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Unidad de Medida</label>
+                                    <select class="form-control" id="unitMeasure">
+                                        <option value="unidad">Unidad</option>
+                                        <option value="kg">Kilogramo</option>
+                                        <option value="litro">Litro</option>
+                                        <option value="metro">Metro</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Categoría</label>
+                                    <input type="text" class="form-control" id="productCategory" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Costo</label>
+                                    <input type="number" step="0.01" class="form-control" id="productCost" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Precio de Venta</label>
+                                    <input type="number" step="0.01" class="form-control" id="productSalePrice" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Ubicación</label>
+                                    <input type="text" class="form-control" id="productLocation" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-center">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="productActive" checked>
+                                    <label class="form-check-label" for="productActive">Activo</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary admin-only">Guardar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== MOVEMENT MODAL ================== -->
+    <div class="modal fade" id="movementModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="movementModalTitle">Nuevo Movimiento</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="movementForm">
+                        <input type="hidden" id="movementId" value="">
+                        <div class="mb-3">
+                            <label class="form-label">Producto</label>
+                            <select class="form-control" id="movementProductId" required>
+                                <!-- Opciones se cargan con JS -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Movimiento</label>
+                            <select class="form-control" id="movementType" required>
+                                <option value="entrada">Entrada</option>
+                                <option value="salida">Salida</option>
+                                <option value="ajuste">Ajuste</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cantidad</label>
+                            <input type="number" class="form-control" id="movementQuantity" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Orden / Referencia</label>
+                            <input type="text" class="form-control" id="movementOrderId">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notas</label>
+                            <textarea class="form-control" id="movementNotes" rows="2"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary admin-only">Guardar Movimiento</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== SCRIPTS ================== -->
+    <!-- Bootstrap JS (bundle con Popper) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+    let productModal, movementModal;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Inicializar modales de Bootstrap
+        productModal = new bootstrap.Modal(document.getElementById('productModal'));
+        movementModal = new bootstrap.Modal(document.getElementById('movementModal'));
+
+        // Capturar elementos
+        const loginForm       = document.getElementById('loginForm');
+        const loginScreen     = document.getElementById('loginScreen');
+        const mainApp         = document.getElementById('mainApp');
+        const currentUserSpan = document.getElementById('currentUser');
+        const sidebar         = document.getElementById('sidebar');
+        const content         = document.getElementById('content');
+        const sidebarToggle   = document.getElementById('sidebarToggle');
+
+        // Restaurar sesión si ya hay token y rol guardados
+        const existingToken = localStorage.getItem('jwtToken');
+        const existingRole  = localStorage.getItem('userRole');
+        const existingUser  = localStorage.getItem('username');
+        if (existingToken && existingRole && existingUser) {
+            loginScreen.style.display = 'none';
+            mainApp.style.display     = 'block';
+            currentUserSpan.textContent = existingUser;
+
+            // Ocultar controles si no es admin
+            if (existingRole !== 'admin') {
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = 'none';
+                });
+            }
+
+            showSection('dashboard');
+        }
+
+        // -------------- LOGIN HANDLER --------------
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            try {
+                const resp = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    alert(data.message || 'Credenciales inválidas');
+                    return;
+                }
+                const data = await resp.json();
+                // Guardar token, rol y username
+                localStorage.setItem('jwtToken', data.access_token);
+                localStorage.setItem('userRole', data.role);
+                localStorage.setItem('username', data.username);
+
+                currentUserSpan.textContent = data.username;
+                loginScreen.style.display = 'none';
+                mainApp.style.display     = 'block';
+
+                // Ocultar controles si no es admin
+                if (data.role !== 'admin') {
+                    document.querySelectorAll('.admin-only').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                }
+
+                showSection('dashboard');
+            } catch (err) {
+                console.error(err);
+                alert('Error de conexión con el servidor');
+            }
+        });
+
+        // -------------- LOGOUT HANDLER --------------
+        window.logout = () => {
+            localStorage.removeItem('jwtToken');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('username');
+            mainApp.style.display    = 'none';
+            loginScreen.style.display = 'flex';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        };
+
+        // -------------- SIDEBAR TOGGLE --------------
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('show');
+            content.classList.toggle('shifted');
+        });
+
+        // -------------- FETCH CON JWT --------------
+        window.fetchWithAuth = async (url, options = {}) => {
+            const token = localStorage.getItem('jwtToken');
+            if (!options.headers) options.headers = {};
+            options.headers['Authorization'] = `Bearer ${token}`;
+            options.headers['Content-Type'] = 'application/json';
+            return fetch(url, options);
+        };
+    });
+
+    // -------------------------------------------------
+    //            FUNCIONES DE NAVEGACIÓN
+    // -------------------------------------------------
+    function showSection(sectionId) {
+        document.querySelectorAll('.section').forEach(sec => {
+            sec.classList.remove('active');
+        });
+        document.getElementById(sectionId).classList.add('active');
+
+        if (sectionId === 'dashboard') {
+            loadDashboardData();
+        } else if (sectionId === 'products') {
+            loadProductsTable();
+        } else if (sectionId === 'movements') {
+            loadMovementsTable();
+        } else if (sectionId === 'stock') {
+            loadStockTable();
+        } else if (sectionId === 'predictions') {
+            loadPredictions();
+        }
+    }
+
+    // -------------------------------------------------
+    //              CARGA DEL DASHBOARD
+    // -------------------------------------------------
+    async function loadDashboardData() {
+        try {
+            // 1) Total de Productos
+            const respP = await fetchWithAuth('/api/products');
+            if (!respP.ok) throw new Error('Error cargando productos');
+            const products = await respP.json();
+            document.getElementById('totalProducts').innerText = products.length;
+
+            // 2) Stock Actual
+            const respS = await fetchWithAuth('/api/stock');
+            if (!respS.ok) throw new Error('Error cargando stock');
+            const stockList = await respS.json();
+            // Stock Bajo (< 10 unidades, por ejemplo)
+            const lowThreshold = 10;
+            const lowStockItems = stockList.filter(item => item.quantity < lowThreshold);
+            document.getElementById('lowStock').innerText = lowStockItems.length;
+            // Valor Total: suma de total_inventory_cost
+            const totalValue = stockList.reduce((acc, item) => acc + item.total_inventory_cost, 0);
+            document.getElementById('totalValue').innerText = '$' + totalValue.toFixed(2);
+
+            // 3) Movimientos Hoy
+            const respM = await fetchWithAuth('/api/movements');
+            if (!respM.ok) throw new Error('Error cargando movimientos');
+            const movements = await respM.json();
+            const hoy = new Date().toDateString();
+            const movementsToday = movements.filter(m => {
+                const fechaMov = new Date(m.date).toDateString();
+                return fechaMov === hoy;
+            });
+            document.getElementById('recentMovements').innerText = movementsToday.length;
+        } catch (err) {
+            console.error('Error en loadDashboardData():', err);
+        }
+    }
+
+    // -------------------------------------------------
+    //         FUNCIONES PARA PRODUCTOS (CRUD)
+    // -------------------------------------------------
+    function showProductModal(product = null) {
+        document.getElementById('productForm').reset();
+        document.getElementById('productId').value = '';
+        document.getElementById('productModalTitle').innerText = 'Nuevo Producto';
+
+        if (product) {
+            document.getElementById('productId').value        = product.product_id;
+            document.getElementById('productName').value      = product.product_name;
+            document.getElementById('productSku').value       = product.sku;
+            document.getElementById('unitMeasure').value      = product.unit_of_measure;
+            document.getElementById('productCategory').value  = product.category;
+            document.getElementById('productCost').value      = product.cost;
+            document.getElementById('productSalePrice').value = product.sale_price;
+            document.getElementById('productLocation').value  = product.location;
+            document.getElementById('productActive').checked  = !!product.active;
+            document.getElementById('productModalTitle').innerText = 'Editar Producto';
+        }
+
+        productModal.show();
+    }
+
+    // Manejo del formulario de producto
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id        = document.getElementById('productId').value;
+        const name      = document.getElementById('productName').value.trim();
+        const sku       = document.getElementById('productSku').value.trim();
+        const unit      = document.getElementById('unitMeasure').value;
+        const category  = document.getElementById('productCategory').value.trim();
+        const cost      = parseFloat(document.getElementById('productCost').value);
+        const salePrice = parseFloat(document.getElementById('productSalePrice').value);
+        const location  = document.getElementById('productLocation').value.trim();
+        const active    = document.getElementById('productActive').checked;
+
+        const payload = {
+            product_name: name,
+            sku: sku,
+            unit_of_measure: unit,
+            cost: cost,
+            sale_price: salePrice,
+            category: category,
+            location: location,
+            active: active
+        };
+
+        try {
+            let resp;
+            if (id) {
+                resp = await fetchWithAuth(`/api/products/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                resp = await fetchWithAuth('/api/products', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+            }
+            if (!resp.ok) {
+                const data = await resp.json();
+                alert(data.message || 'Error al guardar producto');
+                return;
+            }
+            productModal.hide();
+            loadProductsTable();
+            loadDashboardData();
+        } catch (err) {
+            console.error('Error al guardar producto:', err);
+            alert('Error en la conexión al guardar producto');
+        }
+    });
+
+    // Cargar tabla de productos
+    async function loadProductsTable() {
+        try {
+            const resp = await fetchWithAuth('/api/products');
+            if (!resp.ok) throw new Error('Error cargando productos');
+            const products = await resp.json();
+            const tbody = document.getElementById('productsTable');
+            tbody.innerHTML = '';
+            products.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${p.product_id}</td>
+                    <td>${p.product_name}</td>
+                    <td>${p.sku}</td>
+                    <td>${p.category}</td>
+                    <td>${p.sale_price.toFixed(2)}</td>
+                    <td>${p.location}</td>
+                    <td>${p.active ? 'Activo' : 'Inactivo'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning me-1 admin-only" onclick='editProduct(${JSON.stringify(JSON.stringify(p))})'>
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger admin-only" onclick="deleteProduct(${p.product_id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (err) {
+            console.error('Error en loadProductsTable():', err);
+        }
+    }
+
+    // Función auxiliar para pasar objeto desde onclick
+    function editProduct(jsonString) {
+        const p = JSON.parse(JSON.parse(jsonString));
+        showProductModal(p);
+    }
+
+    // Eliminar un producto
+    async function deleteProduct(id) {
+        if (!confirm('¿Seguro que desea eliminar este producto?')) return;
+        try {
+            const resp = await fetchWithAuth(`/api/products/${id}`, {
+                method: 'DELETE'
+            });
+            if (!resp.ok) {
+                const data = await resp.json();
+                alert(data.message || 'Error al eliminar producto');
+                return;
+            }
+            loadProductsTable();
+            loadDashboardData();
+        } catch (err) {
+            console.error('Error en deleteProduct():', err);
+            alert('Error en la conexión al eliminar producto');
+        }
+    }
+
+    // -------------------------------------------------
+    //         FUNCIONES PARA MOVIMIENTOS (CRUD)
+    // -------------------------------------------------
+    function showMovementModal(movement = null) {
+        document.getElementById('movementForm').reset();
+        document.getElementById('movementId').value = '';
+        document.getElementById('movementModalTitle').innerText = 'Nuevo Movimiento';
+
+        // Cargar lista de productos para el select
+        loadProductsForMovementSelect();
+
+        if (movement) {
+            document.getElementById('movementId').value         = movement.movement_id;
+            document.getElementById('movementProductId').value  = movement.product_id;
+            document.getElementById('movementType').value       = movement.movement_type;
+            document.getElementById('movementQuantity').value   = movement.quantity;
+            document.getElementById('movementOrderId').value    = movement.order_id || '';
+            document.getElementById('movementNotes').value      = movement.notes || '';
+            document.getElementById('movementModalTitle').innerText = 'Editar Movimiento';
+        }
+
+        movementModal.show();
+    }
+
+    // Rellenar select de productos en el modal de movimiento
+    async function loadProductsForMovementSelect() {
+        try {
+            const resp = await fetchWithAuth('/api/products');
+            if (!resp.ok) throw new Error('Error obteniendo productos');
+            const products = await resp.json();
+            const sel = document.getElementById('movementProductId');
+            sel.innerHTML = '';
+            products.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.product_id;
+                opt.textContent = `${p.product_name} (SKU: ${p.sku})`;
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            console.error('Error en loadProductsForMovementSelect():', err);
+        }
+    }
+
+    // Manejo del formulario de movimiento
+    document.getElementById('movementForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id        = document.getElementById('movementId').value;
+        const productId = parseInt(document.getElementById('movementProductId').value);
+        const type      = document.getElementById('movementType').value;
+        const quantity  = parseInt(document.getElementById('movementQuantity').value);
+        const orderId   = document.getElementById('movementOrderId').value.trim() || null;
+        const notes     = document.getElementById('movementNotes').value.trim() || null;
+
+        const payload = {
+            product_id: productId,
+            movement_type: type,
+            quantity: quantity,
+            order_id: orderId,
+            notes: notes
+        };
+
+        try {
+            let resp;
+            if (id) {
+                resp = await fetchWithAuth(`/api/movements/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                resp = await fetchWithAuth('/api/movements', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+            }
+            if (!resp.ok) {
+                const data = await resp.json();
+                alert(data.message || 'Error al guardar movimiento');
+                return;
+            }
+            movementModal.hide();
+            loadMovementsTable();
+            loadDashboardData();
+            loadStockTable();
+        } catch (err) {
+            console.error('Error al guardar movimiento:', err);
+            alert('Error en la conexión al guardar movimiento');
+        }
+    });
+
+
+    // -------------------------------------------------
+    // Variables globales para paginación
+    // -------------------------------------------------
+    let allMovements = [];
+    const MOVEMENTS_PER_PAGE = 10;
+    let currentMovPage = 1;
+    let totalMovPages = 1;
+
+    // -------------------------------------------------
+    //  Carga TODOS los movimientos desde la API
+    //  y prepara la paginación
+    // -------------------------------------------------
+
+    // Cargar tabla de movimientos
+    async function loadMovementsTable() {
+         try {
+        const resp = await fetchWithAuth('/api/movements');
+        if (!resp.ok) throw new Error('Error cargando movimientos');
+        allMovements = await resp.json();
+
+        // Calculamos el total de páginas
+        totalMovPages = Math.ceil(allMovements.length / MOVEMENTS_PER_PAGE);
+        currentMovPage = 1; // arrancar en primer página
+
+        // Renderizamos la primera página
+        renderMovementsPage(currentMovPage);
+        // Generamos los controles de paginación
+        renderMovementsPaginationControls();
+    } catch (err) {
+        console.error('Error en loadMovementsTable():', err);
+    }
+}
+
+// -------------------------------------------------
+// Renderiza solo los 15 registros de la página `page`
+// -------------------------------------------------
+function renderMovementsPage(page) {
+    const tbody = document.getElementById('movementsTable');
+    tbody.innerHTML = '';
+
+    // Índices de slice para tomar 15 elementos
+    const startIdx = (page - 1) * MOVEMENTS_PER_PAGE;
+    const endIdx = startIdx + MOVEMENTS_PER_PAGE;
+    const slice = allMovements.slice(startIdx, endIdx);
+
+    slice.forEach(m => {
+        const fecha = new Date(m.date).toLocaleString();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${fecha}</td>
+            <td>${m.product_name}</td>
+            <td>${m.movement_type}</td>
+            <td>${m.quantity}</td>
+            <td>${m.order_id || '-'}</td>
+            <td>${m.notes || ''}</td>
+            <td>
+                <button class="btn btn-sm btn-warning me-1 admin-only"
+                        onclick='editMovement(${JSON.stringify(JSON.stringify(m))})'>
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger admin-only"
+                        onclick="deleteMovement(${m.movement_id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// -------------------------------------------------
+// Genera los botones de paginación (<< Anterior, 1,2,3…, Siguiente >>)
+// -------------------------------------------------
+function renderMovementsPaginationControls() {
+    const ul = document.getElementById('movementsPagination');
+    ul.innerHTML = '';
+
+    // Botón "Anterior"
+    const prevLi = document.createElement('li');
+    prevLi.className = 'page-item' + (currentMovPage === 1 ? ' disabled' : '');
+    prevLi.innerHTML = `
+        <a class="page-link" href="#" aria-label="Anterior"
+           onclick="changeMovPage(${currentMovPage - 1}); return false;">
+            <span aria-hidden="true">&laquo;</span>
+        </a>`;
+    ul.appendChild(prevLi);
+
+    // Botones de número de página
+    for (let i = 1; i <= totalMovPages; i++) {
+        const li = document.createElement('li');
+        li.className = 'page-item' + (i === currentMovPage ? ' active' : '');
+        li.innerHTML = `<a class="page-link" href="#"
+                           onclick="changeMovPage(${i}); return false;">${i}</a>`;
+        ul.appendChild(li);
+    }
+
+    // Botón "Siguiente"
+    const nextLi = document.createElement('li');
+    nextLi.className = 'page-item' + (currentMovPage === totalMovPages ? ' disabled' : '');
+    nextLi.innerHTML = `
+        <a class="page-link" href="#" aria-label="Siguiente"
+           onclick="changeMovPage(${currentMovPage + 1}); return false;">
+            <span aria-hidden="true">&raquo;</span>
+        </a>`;
+    ul.appendChild(nextLi);
+}
+
+// -------------------------------------------------
+// Cambia de página y vuelve a pintar tabla/control
+// -------------------------------------------------
+function changeMovPage(newPage) {
+    if (newPage < 1 || newPage > totalMovPages) return;
+    currentMovPage = newPage;
+    renderMovementsPage(currentMovPage);
+    renderMovementsPaginationControls();
+}
+
+// -------------------------------------------------
+// Eliminar un movimiento y recargar con paginación
+// -------------------------------------------------
+async function deleteMovement(id) {
+    if (!confirm('¿Seguro que desea eliminar este movimiento?')) return;
+    try {
+        const resp = await fetchWithAuth(`/api/movements/${id}`, {
+            method: 'DELETE'
+        });
+        if (!resp.ok) {
+            const data = await resp.json();
+            alert(data.message || 'Error al eliminar movimiento');
+            return;
+        }
+        // Vuelvo a cargar todos los movimientos
+        await loadMovementsTable();
+        loadDashboardData();
+        loadStockTable();
+    } catch (err) {
+        console.error('Error en deleteMovement():', err);
+        alert('Error en la conexión al eliminar movimiento');
+    }
+}
+
+    // Función auxiliar para editar movimiento
+    function editMovement(jsonString) {
+        const m = JSON.parse(JSON.parse(jsonString));
+        showMovementModal(m);
+    }
+
+    // Eliminar movimiento
+    async function deleteMovement(id) {
+        if (!confirm('¿Seguro que desea eliminar este movimiento?')) return;
+        try {
+            const resp = await fetchWithAuth(`/api/movements/${id}`, {
+                method: 'DELETE'
+            });
+            if (!resp.ok) {
+                const data = await resp.json();
+                alert(data.message || 'Error al eliminar movimiento');
+                return;
+            }
+            loadMovementsTable();
+            loadDashboardData();
+            loadStockTable();
+        } catch (err) {
+            console.error('Error en deleteMovement():', err);
+            alert('Error en la conexión al eliminar movimiento');
+        }
+    }
+
+    // -------------------------------------------------
+    //            CARGA TABLA DE STOCK
+    // -------------------------------------------------
+    async function loadStockTable() {
+        try {
+            const resp = await fetchWithAuth('/api/stock');
+            if (!resp.ok) throw new Error('Error cargando stock');
+            const stockList = await resp.json();
+            const tbody = document.getElementById('stockTable');
+            tbody.innerHTML = '';
+            stockList.forEach(s => {
+                const fecha = new Date(s.last_updated).toLocaleString();
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${s.product_name}</td>
+                    <td>${s.sku}</td>
+                    <td>${s.quantity}</td>
+                    <td>${s.cost.toFixed(2)}</td>
+                    <td>${s.total_inventory_cost.toFixed(2)}</td>
+                    <td>${fecha}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (err) {
+            console.error('Error en loadStockTable():', err);
+        }
+    }
+
+    // -------------------------------------------------
+    //            CARGA DE PREDICCIONES
+    // -------------------------------------------------
+    async function loadPredictions() {
+        try {
+            const resp = await fetchWithAuth('/api/predictions');
+            if (!resp.ok) throw new Error('Error cargando predicciones');
+            const preds = await resp.json();
+            const container = document.getElementById('predictionsContainer');
+            container.innerHTML = '';
+            preds.forEach(p => {
+                const div = document.createElement('div');
+                div.classList.add('col-md-4', 'mb-3');
+                div.innerHTML = `
+                    <div class="card prediction-card p-3">
+                        <h5>${p.product_name}</h5>
+                        <p>Predicción: ${p.prediction}</p>
+                        <p>Tendencia: ${p.trend}</p>
+                        <p>Confianza: ${p.confidence}%</p>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        } catch (err) {
+            console.error('Error en loadPredictions():', err);
+        }
+    }
+    </script>
+</body>
+</html>
